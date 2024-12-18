@@ -59,9 +59,10 @@ esp_err_t tmc2208_init(stepper_driver_t *handle)
         .source_clk = UART_SCLK_DEFAULT, // UART_SCLK_APB,
     };
 #if 1
+	const int uart_buffer_size = (1024 * 2);
 	ESP_ERROR_CHECK(uart_driver_install(
 				tmc2208->driver_config.uart_port,
-				sizeof(tmc2208_read_reply_datagram_t),
+				uart_buffer_size,
 				0, 0, NULL, 0));
     ESP_ERROR_CHECK(uart_param_config(tmc2208->driver_config.uart_port,
 				&uart_config));
