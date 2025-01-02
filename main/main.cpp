@@ -139,6 +139,30 @@ public:
         printf("Set motor speed to %ld\n", static_cast<long>(speed));
     }
 
+    void setMotorSpeedRPM(float rpm, unsigned int microsteps = 256, unsigned int fullStepsPerRotation = 200) {
+        // Convert RPM to rotations per second
+        float rotationsPerSecond = rpm / 60.0f;
+        
+        // Convert to microstep frequency (in Hz)
+        // v[Hz] = (rotationsPerSecond) * (fullStepsPerRotation) * (microsteps)
+        float frequencyHz = rotationsPerSecond * fullStepsPerRotation * microsteps;
+
+        // For internal oscillator: v[Hz] = VACTUAL * 0.715
+        // => VACTUAL = v[Hz] / 0.715
+        float vactualFloat = frequencyHz / 0.715f;
+
+        // Round and clamp to 24-bit signed range for TMC2208
+        int32_t vactual = static_cast<int32_t>(vactualFloat);
+        if (vactual > 0x7FFFFF) {
+            vactual = 0x7FFFFF;
+        } else if (vactual < -0x800000) {
+            vactual = -0x800000;
+        }
+
+        // Call the existing integer-based function
+        setMotorSpeed(vactual);
+    }
+
     static void setMicrosteps(unsigned int microsteps) {
         uint8_t mres;
         switch (microsteps) {
