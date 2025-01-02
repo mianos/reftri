@@ -17,9 +17,9 @@
 
 #pragma pack(push, 1)
 
-typedef uint8_t tmc2208_regaddr_t;
+//typedef uint8_t tmc2208_regaddr_t;
 
-enum tmc2208_regaddr_t {
+enum tmc2208_regaddr_t : uint8_t {
     TMC2208_REG_GCONF        = 0x00,
     TMC2208_REG_GSTAT        = 0x01,
     TMC2208_REG_IFCNT        = 0x02,
