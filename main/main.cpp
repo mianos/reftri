@@ -8,7 +8,7 @@
 
 class TMC2208 {
 public:
-    static constexpr gpio_num_t EnablePin = GPIO_NUM_15;
+    static constexpr gpio_num_t EnablePin = GPIO_NUM_17;
     static constexpr gpio_num_t DirectionPin = GPIO_NUM_26;
     static constexpr gpio_num_t StepPin = GPIO_NUM_27;
     static constexpr gpio_num_t SoftwareRxPin = GPIO_NUM_12;
@@ -119,7 +119,7 @@ public:
         return response;
     }
 
-    static void setMotorSpeed(int32_t speed) {
+     static void setMotorSpeed(int32_t speed) {
         if (speed > 0x7FFFFF) speed = 0x7FFFFF;
         if (speed < -0x800000) speed = -0x800000;
 
@@ -137,6 +137,50 @@ public:
         packet[6] = calculateCRC(packet, 6);
         uart_write_bytes(UART_PORT, reinterpret_cast<const char*>(packet), sizeof(packet));
         printf("Set motor speed to %ld\n", static_cast<long>(speed));
+
+        // Read back the short echo from the write command
+        uint8_t writeEcho[4] = {0};
+        int echoedBytes = uart_read_bytes(UART_PORT, writeEcho, sizeof(writeEcho), pdMS_TO_TICKS(100));
+        if (echoedBytes < 4) {
+            printf("Write echo mismatch! Only %d bytes echoed.\n", echoedBytes);
+        }
+
+        // Issue a read command to VACTUAL to verify
+        uint8_t readCommand[4] = {
+            SYNC_BYTE,
+            SLAVE_ADDRESS,
+            VACTUAL_REGISTER, // MSB = 0 for read
+            0
+        };
+        readCommand[3] = calculateCRC(readCommand, 3);
+        uart_write_bytes(UART_PORT, reinterpret_cast<const char*>(readCommand), sizeof(readCommand));
+
+        // Read the echo of the read command
+        uint8_t echoedReadCommand[4] = {0};
+        int readCommandEchoBytes = uart_read_bytes(UART_PORT, echoedReadCommand, sizeof(echoedReadCommand), pdMS_TO_TICKS(100));
+        if (readCommandEchoBytes < 4) {
+            printf("Read command echo mismatch! Only %d bytes echoed.\n", readCommandEchoBytes);
+        }
+
+        // Read the 8-byte response
+        uint8_t responseBuffer[8] = {0};
+        int responseBytes = uart_read_bytes(UART_PORT, responseBuffer, sizeof(responseBuffer), pdMS_TO_TICKS(100));
+        if (responseBytes == 8) {
+            uint8_t responseCRC = calculateCRC(responseBuffer, 7);
+            if (responseCRC == responseBuffer[7]) {
+                int32_t readVactual = (
+                    (static_cast<int32_t>(responseBuffer[3]) << 24) |
+                    (static_cast<int32_t>(responseBuffer[4]) << 16) |
+                    (static_cast<int32_t>(responseBuffer[5]) << 8)  |
+                    static_cast<int32_t>(responseBuffer[6])
+                );
+                printf("Confirmed VACTUAL read-back: %ld\n", static_cast<long>(readVactual));
+            } else {
+                printf("Read-back CRC mismatch! Expected: 0x%02X, Got: 0x%02X\n", responseCRC, responseBuffer[7]);
+            }
+        } else {
+            printf("No or incomplete 8-byte read-back after setMotorSpeed! Received: %d bytes.\n", responseBytes);
+        }
     }
 
     void setMotorSpeedRPM(float rpm, unsigned int microsteps = 256, unsigned int fullStepsPerRotation = 200) {
@@ -199,12 +243,118 @@ public:
         uart_write_bytes(UART_PORT, reinterpret_cast<const char*>(packet), sizeof(packet));
         printf("Microsteps set to: %u\n", microsteps);
     }
+    static void setStealthChop(bool enable) {
+        // 1) Read GCONF (address 0x00)
+        uint8_t readCommand[4] = {
+            SYNC_BYTE,
+            SLAVE_ADDRESS,
+            0x00,  // GCONF register for read
+            0
+        };
+        readCommand[3] = calculateCRC(readCommand, 3);
+        uart_write_bytes(UART_PORT, reinterpret_cast<const char*>(readCommand), sizeof(readCommand));
+
+        // Read back the 4-byte echo
+        uint8_t echoedReadCmd[4] = {0};
+        int echoedBytes = uart_read_bytes(UART_PORT, echoedReadCmd, sizeof(echoedReadCmd), pdMS_TO_TICKS(100));
+        if (echoedBytes < 4) {
+            printf("GCONF read command echo mismatch! Only %d bytes echoed.\n", echoedBytes);
+            return;
+        }
+
+        // Now read the 8-byte response
+        uint8_t responseBuffer[8] = {0};
+        int responseBytes = uart_read_bytes(UART_PORT, responseBuffer, sizeof(responseBuffer), pdMS_TO_TICKS(100));
+        if (responseBytes != 8) {
+            printf("No or incomplete 8-byte GCONF read response! Got %d bytes.\n", responseBytes);
+            return;
+        }
+
+        // Check CRC
+        uint8_t responseCRC = calculateCRC(responseBuffer, 7);
+        if (responseCRC != responseBuffer[7]) {
+            printf("GCONF read CRC mismatch! Expected: 0x%02X, Got: 0x%02X\n", responseCRC, responseBuffer[7]);
+            return;
+        }
+
+        // 2) Parse the returned GCONF (4 data bytes at responseBuffer[3..6])
+        uint32_t gconfValue = (
+            (static_cast<uint32_t>(responseBuffer[3]) << 24) |
+            (static_cast<uint32_t>(responseBuffer[4]) << 16) |
+            (static_cast<uint32_t>(responseBuffer[5]) <<  8) |
+            (static_cast<uint32_t>(responseBuffer[6])      )
+        );
+
+        // For stealthChop => clear en_spreadCycle bit (bit 2 = 0)
+        // For spreadCycle  => set en_spreadCycle bit (bit 2 = 1)
+        // bit 2 mask = 1 << 2
+        if (enable) {
+            // stealthChop
+            gconfValue &= ~(1 << 2); 
+        } else {
+            // spreadCycle
+            gconfValue |= (1 << 2);  
+        }
+
+        // 3) Write the modified value to GCONF (address 0x00 OR 0x80 = 0x80)
+        //    We do a standard 8-byte TMC2208 write packet
+        uint8_t packet[8] = {
+            SYNC_BYTE,
+            SLAVE_ADDRESS,
+            static_cast<uint8_t>(0x00 | 0x80), // 0x80 => write GCONF
+            static_cast<uint8_t>((gconfValue >> 24) & 0xFF),
+            static_cast<uint8_t>((gconfValue >> 16) & 0xFF),
+            static_cast<uint8_t>((gconfValue >> 8)  & 0xFF),
+            static_cast<uint8_t>(gconfValue & 0xFF),
+            0 // CRC placeholder
+        };
+
+        packet[7] = calculateCRC(packet, 7);
+        uart_write_bytes(UART_PORT, reinterpret_cast<const char*>(packet), sizeof(packet));
+
+        printf("GCONF updated. stealthChop is now %s.\n", enable ? "ENABLED" : "DISABLED");
+
+        // Optional: read short echo (4 bytes)
+        uint8_t writeEcho[4] = {0};
+        int echoCount = uart_read_bytes(UART_PORT, writeEcho, sizeof(writeEcho), pdMS_TO_TICKS(100));
+        if (echoCount < 4) {
+            printf("GCONF write echo mismatch! Only %d bytes echoed.\n", echoCount);
+        }
+}
+
 };
+
+
+class GpioStepper {
+public:
+    GpioStepper() {
+        gpio_config_t ioConfig;
+        ioConfig.pin_bit_mask = (1ULL << GPIO_NUM_2);
+        ioConfig.mode = GPIO_MODE_OUTPUT;
+        ioConfig.pull_up_en = GPIO_PULLUP_DISABLE;
+        ioConfig.pull_down_en = GPIO_PULLDOWN_DISABLE;
+        ioConfig.intr_type = GPIO_INTR_DISABLE;
+        gpio_config(&ioConfig);
+
+    }
+
+
+    static void toggle() {
+        static bool pinState = false;
+        pinState = !pinState;
+        gpio_set_level(GPIO_NUM_2, pinState ? 1 : 0);
+    }
+};
+
 
 extern "C" void app_main() {
     TMC2208 driver;
 
+    driver.setStealthChop(true);
+    GpioStepper stepper;
+    
     while (true) {
+#if 0
         std::array<uint8_t, 8> response = TMC2208::getDriverStatus();
         if (response.empty()) {
             printf("Failed to get driver status!\n");
@@ -212,6 +362,9 @@ extern "C" void app_main() {
             printf("\nDRV_STATUS: ");
             TMC2208::decodeDriverStatus(response);
         }
-        vTaskDelay(pdMS_TO_TICKS(5000));
+#endif
+   //     driver.setMotorSpeedRPM(100);
+        stepper.toggle();
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
