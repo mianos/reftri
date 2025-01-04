@@ -6,11 +6,14 @@
 #include "driver/uart.h"
 #include "driver/gpio.h"
 
+#include "rmtstepper.h"
+
+
 class TMC2208 {
 public:
     static constexpr gpio_num_t EnablePin = GPIO_NUM_17;
     static constexpr gpio_num_t DirectionPin = GPIO_NUM_26;
-    static constexpr gpio_num_t StepPin = GPIO_NUM_27;
+    static constexpr gpio_num_t StepPin = GPIO_NUM_2;
     static constexpr gpio_num_t SoftwareRxPin = GPIO_NUM_12;
     static constexpr gpio_num_t SoftwareTxPin = GPIO_NUM_13;
 
@@ -325,34 +328,13 @@ public:
 };
 
 
-class GpioStepper {
-public:
-    GpioStepper() {
-        gpio_config_t ioConfig;
-        ioConfig.pin_bit_mask = (1ULL << GPIO_NUM_2);
-        ioConfig.mode = GPIO_MODE_OUTPUT;
-        ioConfig.pull_up_en = GPIO_PULLUP_DISABLE;
-        ioConfig.pull_down_en = GPIO_PULLDOWN_DISABLE;
-        ioConfig.intr_type = GPIO_INTR_DISABLE;
-        gpio_config(&ioConfig);
-
-    }
-
-
-    static void toggle() {
-        static bool pinState = false;
-        pinState = !pinState;
-        gpio_set_level(GPIO_NUM_2, pinState ? 1 : 0);
-    }
-};
-
-
 extern "C" void app_main() {
     TMC2208 driver;
 
-    driver.setStealthChop(true);
-    GpioStepper stepper;
-    
+//    driver.setStealthChop(true);
+    RMTStepper stepper(driver.StepPin);
+ 
+    stepper.setFrequency(1000.0);    
     while (true) {
 #if 0
         std::array<uint8_t, 8> response = TMC2208::getDriverStatus();
@@ -362,9 +344,11 @@ extern "C" void app_main() {
             printf("\nDRV_STATUS: ");
             TMC2208::decodeDriverStatus(response);
         }
+
 #endif
-   //     driver.setMotorSpeedRPM(100);
-        stepper.toggle();
-        vTaskDelay(pdMS_TO_TICKS(10));
+
+
+ //       stepper.toggle();
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
