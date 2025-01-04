@@ -15,21 +15,23 @@ public:
         initRMTChannel();
     }
 
-    void setFrequency(float frequencyHz) {
+    // Returns esp_err_t so the caller can check for errors
+    esp_err_t setFrequency(float frequencyHz) {
+        // Always stop the old infinite loop first
+        stop();
+
         if (frequencyHz <= 0.0f) {
             printf("Invalid frequency: %f\n", frequencyHz);
-            return;
+            return ESP_ERR_INVALID_ARG;
         }
 
         uint32_t halfPeriodTicks = static_cast<uint32_t>((resolutionHz / frequencyHz) / 2);
         if (halfPeriodTicks == 0) {
-            // Use "%lu" and cast to unsigned long to avoid warnings
             printf("Frequency too high for resolution %lu\n",
                    (unsigned long)resolutionHz);
-            return;
+            return ESP_ERR_INVALID_ARG;
         }
 
-        // Prepare one RMT symbol (high for half period, low for half period)
         rmt_symbol_word_t pulseSymbol;
         pulseSymbol.level0 = 1;
         pulseSymbol.duration0 = halfPeriodTicks;
@@ -51,20 +53,20 @@ public:
         if (err != ESP_OK) {
             printf("rmt_transmit failed with error: %d\n", err);
         }
+        return err;
     }
 
     void stop() {
-        // This stops the looping transmission
+        // This stops the indefinite loop
         if (motorChan) {
-            // rmt_disable stops any active transmission
+            // rmt_disable halts any active transmission
             ESP_ERROR_CHECK(rmt_disable(motorChan));
-            // Re-enable the channel so we can transmit again later
+            // Re-enable channel so we can transmit again later
             ESP_ERROR_CHECK(rmt_enable(motorChan));
         }
     }
 
     ~RMTStepper() {
-        // Clean up
         if (motorChan) {
             ESP_ERROR_CHECK(rmt_del_channel(motorChan));
         }
