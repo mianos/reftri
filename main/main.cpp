@@ -2,11 +2,11 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-
+#include <vector>
 #include "driver/uart.h"
 #include "driver/gpio.h"
 
-#include "rmtstepper.h"
+// #include "rmtstepper.h"
 
 
 class TMC2208 {
@@ -29,7 +29,7 @@ public:
     static constexpr uart_port_t UART_PORT = UART_NUM_1;
 
     TMC2208() {
-        uart_config_t uartConfig;
+        uart_config_t uartConfig{};
         uartConfig.baud_rate = 115200;
         uartConfig.data_bits = UART_DATA_8_BITS;
         uartConfig.parity = UART_PARITY_DISABLE;
@@ -45,14 +45,6 @@ public:
         gpio_set_direction(DirectionPin, GPIO_MODE_OUTPUT);
         gpio_set_direction(StepPin, GPIO_MODE_OUTPUT);
         gpio_set_level(EnablePin, 0);
-    }
-
-    static uint8_t CalculateChecksum(const uint8_t* data, size_t length) {
-        uint8_t checksum = 0;
-        for (size_t index = 0; index < length; index++) {
-            checksum ^= data[index];
-        }
-        return checksum;
     }
 
     static uint8_t calculateCRC(uint8_t datagram[], uint8_t length) {
@@ -72,119 +64,169 @@ public:
         return crc;
     }
 
-    static void decodeDriverStatus(const std::array<uint8_t, 8>& response) {
-        if (response[0] != 0x05 || response[1] != 0xFF || response[2] != DRV_STATUS_REGISTER) {
-            printf("Invalid response header.\n");
-            return;
-        }
-        uint32_t data = (response[3] << 24) | (response[4] << 16) | (response[5] << 8) | response[6];
-        printf("StallGuard Result (SG_RESULT): %d\n", static_cast<int>((data >> 24) & 0xFF));
-        printf("Full Step Active (FS_ACTIVE): %d\n", static_cast<int>((data >> 23) & 0x1));
-        printf("Current Scaling (CS_ACTUAL): %d\n", static_cast<int>((data >> 16) & 0x7F));
-        printf("Stall Detected (STALLGUARD): %d\n", static_cast<int>((data >> 15) & 0x1));
-        printf("Overtemp Warning (OTPW): %d\n", static_cast<int>((data >> 14) & 0x1));
-        printf("Overtemp Shutdown (OT): %d\n", static_cast<int>((data >> 13) & 0x1));
-        printf("Short to GND Phase A (S2GA): %d\n", static_cast<int>((data >> 12) & 0x1));
-        printf("Short to GND Phase B (S2GB): %d\n", static_cast<int>((data >> 11) & 0x1));
-        printf("Open Load Phase A (OLA): %d\n", static_cast<int>((data >> 10) & 0x1));
-        printf("Open Load Phase B (OLB): %d\n", static_cast<int>((data >> 9) & 0x1));
-        printf("Overtemp Thresholds (T120/143): %d\n", static_cast<int>((data >> 4) & 0x1F));
-        printf("Overtemp Shutdown (T150): %d\n", static_cast<int>((data >> 3) & 0x1));
-        printf("IC Reset (RESET): %d\n", static_cast<int>((data >> 2) & 0x1));
-        printf("Driver Error (DRV_ERROR): %d\n", static_cast<int>(data & 0x3));
+static void decodeDriverStatus(const std::array<uint8_t, 8>& response) {
+    // Print raw response in hex
+    printf("Raw response: ");
+    for (uint8_t byte : response) printf("%02X ", byte);
+    printf("\n");
+
+    if (response[0] != 0x05 || response[1] != 0xFF || response[2] != DRV_STATUS_REGISTER) {
+        printf("Invalid response header.\n");
+        return;
     }
 
-    static std::array<uint8_t, 8> getDriverStatus() {
-        uint8_t command[4] = { SYNC_BYTE, SLAVE_ADDRESS, DRV_STATUS_REGISTER, 0 };
-        command[3] = calculateCRC(command, 3);
-        uart_write_bytes(UART_PORT, reinterpret_cast<const char*>(command), sizeof(command));
+    // Extract 24-bit data
+    uint32_t data = (static_cast<uint32_t>(response[4]) << 16) |
+                    (static_cast<uint32_t>(response[5]) << 8) |
+                    static_cast<uint32_t>(response[6]);
 
-        uint8_t echoedOutput[4] = { 0 };
-        uart_read_bytes(UART_PORT, echoedOutput, sizeof(echoedOutput), pdMS_TO_TICKS(100));
-        if (std::memcmp(command, echoedOutput, sizeof(command)) != 0) {
-            printf("Echo mismatch! Command not reflected correctly.\n");
-            return { 0 };
-        }
+    // Assign bit-masked fields to variables
+    int sgResult   = (data >> 16) & 0xFF;
+    int fsActive   = (data >> 15) & 0x1;
+    int csActual   = (data >> 8) & 0x7F;
+    int stallGuard = (data >> 7) & 0x1;
+    int otpw       = (data >> 6) & 0x1;
+    int ot         = (data >> 5) & 0x1;
+    int s2ga       = (data >> 4) & 0x1;
+    int s2gb       = (data >> 3) & 0x1;
+    int ola        = (data >> 2) & 0x1;
+    int olb        = (data >> 1) & 0x1;
+    int drvError   = data & 0x1;
 
-        std::array<uint8_t, 8> response = { 0 };
-        int bytesRead = uart_read_bytes(UART_PORT, response.data(), response.size(), pdMS_TO_TICKS(100));
-        if (bytesRead != 8) {
-            printf("Invalid response length: %d bytes received.\n", bytesRead);
-            return { 0 };
-        }
+    // Print decoded fields
+    printf("SG_RESULT: %d, FS_ACTIVE: %d, CS_ACTUAL: %d, STALLGUARD: %d\n",
+           sgResult, fsActive, csActual, stallGuard);
+    printf("OTPW: %d, OT: %d, S2GA: %d, S2GB: %d, OLA: %d, OLB: %d, DRV_ERROR: %d\n",
+           otpw, ot, s2ga, s2gb, ola, olb, drvError);
+}
 
-        uint8_t expectedCRC = calculateCRC(response.data(), 7);
-        if (expectedCRC != response[7]) {
-            printf("CRC mismatch! Expected: 0x%02X, Received: 0x%02X\n", expectedCRC, response[7]);
-            return { 0 };
-        }
 
-        return response;
+static void configureCurrentScaling(uint8_t irun, uint8_t ihold) {
+    uint32_t chopconf = 0x00000000;
+    chopconf |= (irun << 8);  // Set IRUN (run current)
+    chopconf |= (ihold << 4);  // Set IHOLD (hold current)
+
+    uint8_t packet[8] = {
+        SYNC_BYTE,
+        SLAVE_ADDRESS,
+        static_cast<uint8_t>(CHOPCONF_REGISTER | 0x80),
+        static_cast<uint8_t>((chopconf >> 24) & 0xFF),
+        static_cast<uint8_t>((chopconf >> 16) & 0xFF),
+        static_cast<uint8_t>((chopconf >> 8) & 0xFF),
+        static_cast<uint8_t>(chopconf & 0xFF),
+        0  // CRC placeholder
+    };
+    packet[7] = calculateCRC(packet, 7);
+
+    if (sendCommandWithEcho(packet, sizeof(packet))) {
+        printf("Current scaling configured: IRUN = %d, IHOLD = %d\n", irun, ihold);
+    } else {
+        printf("Failed to configure current scaling.\n");
+    }
+}
+
+
+static std::array<uint8_t, 8> getDriverStatus() {
+    std::array<uint8_t, 8> responseBuffer = {0};
+
+    uint8_t readCommand[4] = {
+        SYNC_BYTE,
+        SLAVE_ADDRESS,
+        DRV_STATUS_REGISTER,  // MSB = 0 for read
+        0  // CRC placeholder
+    };
+    readCommand[3] = calculateCRC(readCommand, 3);
+
+    if (!sendCommandWithEcho(readCommand, sizeof(readCommand))) {
+        printf("Failed to read DRV_STATUS due to echo verification error.\n");
+        return responseBuffer;
     }
 
-     static void setMotorSpeed(int32_t speed) {
-        if (speed > 0x7FFFFF) speed = 0x7FFFFF;
-        if (speed < -0x800000) speed = -0x800000;
-
-        uint8_t packet[8] = {
-            SYNC_BYTE,
-            SLAVE_ADDRESS,
-            static_cast<uint8_t>(VACTUAL_REGISTER | 0x80),
-            static_cast<uint8_t>((speed >> 16) & 0xFF),
-            static_cast<uint8_t>((speed >> 8) & 0xFF),
-            static_cast<uint8_t>(speed & 0xFF),
-            0,
-            0x7F
-        };
-
-        packet[6] = calculateCRC(packet, 6);
-        uart_write_bytes(UART_PORT, reinterpret_cast<const char*>(packet), sizeof(packet));
-        printf("Set motor speed to %ld\n", static_cast<long>(speed));
-
-        // Read back the short echo from the write command
-        uint8_t writeEcho[4] = {0};
-        int echoedBytes = uart_read_bytes(UART_PORT, writeEcho, sizeof(writeEcho), pdMS_TO_TICKS(100));
-        if (echoedBytes < 4) {
-            printf("Write echo mismatch! Only %d bytes echoed.\n", echoedBytes);
-        }
-
-        // Issue a read command to VACTUAL to verify
-        uint8_t readCommand[4] = {
-            SYNC_BYTE,
-            SLAVE_ADDRESS,
-            VACTUAL_REGISTER, // MSB = 0 for read
-            0
-        };
-        readCommand[3] = calculateCRC(readCommand, 3);
-        uart_write_bytes(UART_PORT, reinterpret_cast<const char*>(readCommand), sizeof(readCommand));
-
-        // Read the echo of the read command
-        uint8_t echoedReadCommand[4] = {0};
-        int readCommandEchoBytes = uart_read_bytes(UART_PORT, echoedReadCommand, sizeof(echoedReadCommand), pdMS_TO_TICKS(100));
-        if (readCommandEchoBytes < 4) {
-            printf("Read command echo mismatch! Only %d bytes echoed.\n", readCommandEchoBytes);
-        }
-
-        // Read the 8-byte response
-        uint8_t responseBuffer[8] = {0};
-        int responseBytes = uart_read_bytes(UART_PORT, responseBuffer, sizeof(responseBuffer), pdMS_TO_TICKS(100));
-        if (responseBytes == 8) {
-            uint8_t responseCRC = calculateCRC(responseBuffer, 7);
-            if (responseCRC == responseBuffer[7]) {
-                int32_t readVactual = (
-                    (static_cast<int32_t>(responseBuffer[3]) << 24) |
-                    (static_cast<int32_t>(responseBuffer[4]) << 16) |
-                    (static_cast<int32_t>(responseBuffer[5]) << 8)  |
-                    static_cast<int32_t>(responseBuffer[6])
-                );
-                printf("Confirmed VACTUAL read-back: %ld\n", static_cast<long>(readVactual));
-            } else {
-                printf("Read-back CRC mismatch! Expected: 0x%02X, Got: 0x%02X\n", responseCRC, responseBuffer[7]);
-            }
+    int responseBytes = uart_read_bytes(UART_PORT, responseBuffer.data(), responseBuffer.size(), pdMS_TO_TICKS(100));
+    if (responseBytes == 8) {
+        uint8_t responseCRC = calculateCRC(responseBuffer.data(), 7);
+        if (responseCRC == responseBuffer[7]) {
+            printf("DRV_STATUS read-back successful.\n");
         } else {
-            printf("No or incomplete 8-byte read-back after setMotorSpeed! Received: %d bytes.\n", responseBytes);
+            printf("DRV_STATUS read CRC mismatch! Expected: 0x%02X, Got: 0x%02X\n", responseCRC, responseBuffer[7]);
         }
+    } else {
+        printf("No or incomplete 8-byte read-back after reading DRV_STATUS! Received: %d bytes.\n", responseBytes);
     }
+
+    return responseBuffer;
+}
+
+
+	static void setMotorSpeed(int32_t speed) {
+		if (speed > 0x7FFFFF) speed = 0x7FFFFF;
+		if (speed < -0x800000) speed = -0x800000;
+
+		// Step 1: Prepare the write packet for VACTUAL
+		uint8_t packet[8] = {
+			SYNC_BYTE,
+			SLAVE_ADDRESS,
+			static_cast<uint8_t>(VACTUAL_REGISTER | 0x80),  // 0x80 indicates write
+			static_cast<uint8_t>((speed >> 16) & 0xFF),
+			static_cast<uint8_t>((speed >> 8) & 0xFF),
+			static_cast<uint8_t>(speed & 0xFF),
+			0,  // CRC placeholder
+			0x7F
+		};
+		packet[6] = calculateCRC(packet, 6);
+
+		// Step 2: Send the write packet and verify echo
+		if (!sendCommandWithEcho(packet, sizeof(packet))) {
+			printf("Failed to set motor speed due to echo verification error.\n");
+			return;
+		}
+
+		printf("Set motor speed to %ld\n", static_cast<long>(speed));
+
+		// Step 3: Prepare the read command for VACTUAL verification
+		uint8_t readCommand[4] = {
+			SYNC_BYTE,
+			SLAVE_ADDRESS,
+			VACTUAL_REGISTER,  // MSB = 0 for read
+			0  // CRC placeholder
+		};
+		readCommand[3] = calculateCRC(readCommand, 3);
+
+    vTaskDelay(pdMS_TO_TICKS(130));
+
+
+		// Send the read command and verify echo
+		if (!sendCommandWithEcho(readCommand, sizeof(readCommand))) {
+			printf("Failed to verify motor speed due to read command echo verification error.\n");
+			return;
+		}
+
+		// Step 4: Read the 8-byte response
+		uint8_t responseBuffer[8] = {0};
+		int responseBytes = uart_read_bytes(UART_PORT, responseBuffer, sizeof(responseBuffer), pdMS_TO_TICKS(100));
+		if (responseBytes == 8) {
+			uint8_t responseCRC = calculateCRC(responseBuffer, 7);
+			if (responseCRC == responseBuffer[7]) {
+                // Parse the 24-bit signed VACTUAL value (responseBuffer[3..5])
+                int32_t readVactual = (
+                    (static_cast<int32_t>(responseBuffer[3]) << 16) |
+                    (static_cast<int32_t>(responseBuffer[4]) << 8)  |
+                    static_cast<int32_t>(responseBuffer[5])
+                );
+
+                // Sign extend the 24-bit value to 32 bits
+                if (readVactual & (1 << 23)) {  // If the sign bit (23rd bit) is set
+                    readVactual |= 0xFF000000;  // Extend the sign to 32 bits
+                }
+
+                printf("Confirmed VACTUAL read-back: %ld\n", static_cast<long>(readVactual));
+			} else {
+				printf("Read-back CRC mismatch! Expected: 0x%02X, Got: 0x%02X\n", responseCRC, responseBuffer[7]);
+			}
+		} else {
+			printf("No or incomplete 8-byte read-back after setMotorSpeed! Received: %d bytes.\n", responseBytes);
+		}
+	}
 
     void setMotorSpeedRPM(float rpm, unsigned int microsteps = 256, unsigned int fullStepsPerRotation = 200) {
         // Convert RPM to rotations per second
@@ -210,145 +252,273 @@ public:
         setMotorSpeed(vactual);
     }
 
-    static void setMicrosteps(unsigned int microsteps) {
-        uint8_t mres;
-        switch (microsteps) {
-            case 1:   mres = 0b00000; break;
-            case 2:   mres = 0b00001; break;
-            case 4:   mres = 0b00010; break;
-            case 8:   mres = 0b00011; break;
-            case 16:  mres = 0b00100; break;
-            case 32:  mres = 0b00101; break;
-            case 64:  mres = 0b00110; break;
-            case 128: mres = 0b00111; break;
-            case 256: mres = 0b01000; break;
-            default:
-                printf("Invalid microstep value: %u. Must be a power of 2 between 1 and 256.\n", microsteps);
-                return;
+    static bool sendCommandWithEcho(uint8_t* packet, size_t packetSize) {
+        packet[packetSize - 1] = calculateCRC(packet, packetSize - 1);  // Calculate and set CRC
+        uart_write_bytes(UART_PORT, reinterpret_cast<const char*>(packet), packetSize);
+
+        // Read back the echo
+        uint8_t echoBuffer[8] = {0};
+        int echoedBytes = uart_read_bytes(UART_PORT, echoBuffer, packetSize, pdMS_TO_TICKS(100));
+        if (echoedBytes != packetSize) {
+            printf("Echo mismatch! Expected %d bytes, got %d bytes.\n", (int)packetSize, echoedBytes);
+            return false;
         }
 
-        uint32_t chopconf = 0x00000000;
-        chopconf &= ~(0x1F << 20);
-        chopconf |= (mres << 20);
+        // Verify echo matches sent packet
+        if (memcmp(packet, echoBuffer, packetSize) != 0) {
+            printf("Echo verification failed! Sent and echoed packets differ.\n");
+            return false;
+        }
 
-        uint8_t packet[8] = {
-            SYNC_BYTE,
-            SLAVE_ADDRESS,
-            static_cast<uint8_t>(CHOPCONF_REGISTER | 0x80),
-            static_cast<uint8_t>((chopconf >> 24) & 0xFF),
-            static_cast<uint8_t>((chopconf >> 16) & 0xFF),
-            static_cast<uint8_t>((chopconf >> 8) & 0xFF),
-            static_cast<uint8_t>(chopconf & 0xFF),
-            0
-        };
-
-        packet[7] = calculateCRC(packet, 7);
-        uart_write_bytes(UART_PORT, reinterpret_cast<const char*>(packet), sizeof(packet));
-        printf("Microsteps set to: %u\n", microsteps);
+        return true;
     }
-    static void setStealthChop(bool enable) {
-        // 1) Read GCONF (address 0x00)
+    static void setMicrosteps(unsigned int microsteps) {
+    uint8_t mres;
+    switch (microsteps) {
+        case 1:   mres = 0b00000; break;
+        case 2:   mres = 0b00001; break;
+        case 4:   mres = 0b00010; break;
+        case 8:   mres = 0b00011; break;
+        case 16:  mres = 0b00100; break;
+        case 32:  mres = 0b00101; break;
+        case 64:  mres = 0b00110; break;
+        case 128: mres = 0b00111; break;
+        case 256: mres = 0b01000; break;
+        default:
+            printf("Invalid microstep value: %u. Must be a power of 2 between 1 and 256.\n", microsteps);
+            return;
+    }
+
+    // Step 1: Read the current CHOPCONF value
+    uint8_t readCommand[4] = {
+        SYNC_BYTE,
+        SLAVE_ADDRESS,
+        static_cast<uint8_t>(CHOPCONF_REGISTER),
+        0  // CRC placeholder
+    };
+    readCommand[3] = calculateCRC(readCommand, 3);
+
+    if (!sendCommandWithEcho(readCommand, sizeof(readCommand))) {
+        printf("Failed to read CHOPCONF due to echo verification error.\n");
+        return;
+    }
+
+    // Step 2: Read back the 8-byte response
+    uint8_t responseBuffer[8] = {0};
+    int responseBytes = uart_read_bytes(UART_PORT, responseBuffer, sizeof(responseBuffer), pdMS_TO_TICKS(100));
+    if (responseBytes != sizeof(responseBuffer)) {
+        printf("Failed to read CHOPCONF! Got %d bytes.\n", responseBytes);
+        return;
+    }
+
+    uint8_t responseCRC = calculateCRC(responseBuffer, 7);
+    if (responseCRC != responseBuffer[7]) {
+        printf("CHOPCONF read CRC mismatch! Expected: 0x%02X, Got: 0x%02X\n", responseCRC, responseBuffer[7]);
+        return;
+    }
+
+    // Parse the current CHOPCONF value
+    uint32_t chopconf = (
+        (static_cast<uint32_t>(responseBuffer[3]) << 24) |
+        (static_cast<uint32_t>(responseBuffer[4]) << 16) |
+        (static_cast<uint32_t>(responseBuffer[5]) << 8)  |
+        (static_cast<uint32_t>(responseBuffer[6]))
+    );
+
+    // Step 3: Modify the MRES bits (bits 24 to 28)
+    chopconf &= ~(0x1F << 24);  // Clear MRES bits
+    chopconf |= (mres << 24);   // Set new MRES value
+
+    // Step 4: Prepare the write packet
+    uint8_t packet[8] = {
+        SYNC_BYTE,
+        SLAVE_ADDRESS,
+        static_cast<uint8_t>(CHOPCONF_REGISTER | 0x80),  // 0x80 indicates write to CHOPCONF
+        static_cast<uint8_t>((chopconf >> 24) & 0xFF),
+        static_cast<uint8_t>((chopconf >> 16) & 0xFF),
+        static_cast<uint8_t>((chopconf >> 8) & 0xFF),
+        static_cast<uint8_t>(chopconf & 0xFF),
+        0  // CRC placeholder
+    };
+    packet[7] = calculateCRC(packet, 7);
+
+    // Step 5: Send the write packet and verify echo
+    if (sendCommandWithEcho(packet, sizeof(packet))) {
+        printf("Microsteps set to: %u\n", microsteps);
+    } else {
+        printf("Failed to set microsteps due to echo verification error.\n");
+    }
+}
+
+    static bool readGCONF(uint32_t& gconfValue) {
         uint8_t readCommand[4] = {
             SYNC_BYTE,
             SLAVE_ADDRESS,
             0x00,  // GCONF register for read
-            0
+            0  // CRC placeholder
         };
-        readCommand[3] = calculateCRC(readCommand, 3);
-        uart_write_bytes(UART_PORT, reinterpret_cast<const char*>(readCommand), sizeof(readCommand));
 
-        // Read back the 4-byte echo
-        uint8_t echoedReadCmd[4] = {0};
-        int echoedBytes = uart_read_bytes(UART_PORT, echoedReadCmd, sizeof(echoedReadCmd), pdMS_TO_TICKS(100));
-        if (echoedBytes < 4) {
-            printf("GCONF read command echo mismatch! Only %d bytes echoed.\n", echoedBytes);
-            return;
+        if (!sendCommandWithEcho(readCommand, sizeof(readCommand))) {
+            printf("Failed to read GCONF due to echo verification error.\n");
+            return false;
         }
 
-        // Now read the 8-byte response
+        // Read the 8-byte response
         uint8_t responseBuffer[8] = {0};
         int responseBytes = uart_read_bytes(UART_PORT, responseBuffer, sizeof(responseBuffer), pdMS_TO_TICKS(100));
         if (responseBytes != 8) {
             printf("No or incomplete 8-byte GCONF read response! Got %d bytes.\n", responseBytes);
-            return;
+            return false;
         }
 
-        // Check CRC
+        // Verify CRC
         uint8_t responseCRC = calculateCRC(responseBuffer, 7);
         if (responseCRC != responseBuffer[7]) {
             printf("GCONF read CRC mismatch! Expected: 0x%02X, Got: 0x%02X\n", responseCRC, responseBuffer[7]);
-            return;
+            return false;
         }
 
-        // 2) Parse the returned GCONF (4 data bytes at responseBuffer[3..6])
-        uint32_t gconfValue = (
+        // Parse GCONF value from response
+        gconfValue = (
             (static_cast<uint32_t>(responseBuffer[3]) << 24) |
             (static_cast<uint32_t>(responseBuffer[4]) << 16) |
-            (static_cast<uint32_t>(responseBuffer[5]) <<  8) |
-            (static_cast<uint32_t>(responseBuffer[6])      )
+            (static_cast<uint32_t>(responseBuffer[5]) << 8)  |
+            (static_cast<uint32_t>(responseBuffer[6]))
         );
 
-        // For stealthChop => clear en_spreadCycle bit (bit 2 = 0)
-        // For spreadCycle  => set en_spreadCycle bit (bit 2 = 1)
-        // bit 2 mask = 1 << 2
-        if (enable) {
-            // stealthChop
-            gconfValue &= ~(1 << 2); 
-        } else {
-            // spreadCycle
-            gconfValue |= (1 << 2);  
+        return true;
+    }
+
+
+    static void setStealthChop(bool enable) {
+    uint32_t gconfValue = 0;
+
+    // Step 1: Read current GCONF value
+    if (!readGCONF(gconfValue)) {
+        printf("Failed to get GCONF.\n");
+        return;
+    }
+
+    // Step 2: Print the current mode
+    if (gconfValue & (1 << 3)) {
+        printf("Current mode: SpreadCycle (bit 3 = 1)\n");
+    } else {
+        printf("Current mode: StealthChop (bit 3 = 0)\n");
+    }
+
+    // Step 3: Modify GCONF value to toggle StealthChop/SpreadCycle
+    if (enable) {
+        gconfValue &= ~(1 << 3);  // Clear bit 3 for StealthChop
+    } else {
+        gconfValue |= (1 << 3);   // Set bit 3 for SpreadCycle
+    }
+
+    // Step 4: Prepare the write packet
+    uint8_t packet[8] = {
+        SYNC_BYTE,
+        SLAVE_ADDRESS,
+        static_cast<uint8_t>(0x00 | 0x80),  // 0x80 indicates write to GCONF
+        static_cast<uint8_t>((gconfValue >> 24) & 0xFF),
+        static_cast<uint8_t>((gconfValue >> 16) & 0xFF),
+        static_cast<uint8_t>((gconfValue >> 8) & 0xFF),
+        static_cast<uint8_t>(gconfValue & 0xFF),
+        0  // CRC placeholder
+    };
+    packet[7] = calculateCRC(packet, 7);
+
+    // Step 5: Send the packet and verify echo
+    if (!sendCommandWithEcho(packet, sizeof(packet))) {
+        printf("Failed to write GCONF due to echo verification error.\n");
+        return;
+    }
+
+    printf("GCONF updated. StealthChop is now %s.\n", enable ? "ENABLED" : "DISABLED");
+
+    // Step 6: Short delay before reading back GCONF to confirm the change
+    vTaskDelay(pdMS_TO_TICKS(100));  // Delay to allow TMC2208 to apply changes
+
+    // Step 7: Retry reading GCONF up to 3 times to ensure consistent confirmation
+    for (int i = 0; i < 3; ++i) {
+        if (readGCONF(gconfValue)) {
+            if (enable && !(gconfValue & (1 << 3))) {
+                printf("Confirmed mode: StealthChop (bit 3 = 0)\n");
+                return;
+            } else if (!enable && (gconfValue & (1 << 3))) {
+                printf("Confirmed mode: SpreadCycle (bit 3 = 1)\n");
+                return;
+            }
         }
+        vTaskDelay(pdMS_TO_TICKS(20));  // Short delay before retrying
+    }
 
-        // 3) Write the modified value to GCONF (address 0x00 OR 0x80 = 0x80)
-        //    We do a standard 8-byte TMC2208 write packet
-        uint8_t packet[8] = {
-            SYNC_BYTE,
-            SLAVE_ADDRESS,
-            static_cast<uint8_t>(0x00 | 0x80), // 0x80 => write GCONF
-            static_cast<uint8_t>((gconfValue >> 24) & 0xFF),
-            static_cast<uint8_t>((gconfValue >> 16) & 0xFF),
-            static_cast<uint8_t>((gconfValue >> 8)  & 0xFF),
-            static_cast<uint8_t>(gconfValue & 0xFF),
-            0 // CRC placeholder
-        };
-
-        packet[7] = calculateCRC(packet, 7);
-        uart_write_bytes(UART_PORT, reinterpret_cast<const char*>(packet), sizeof(packet));
-
-        printf("GCONF updated. stealthChop is now %s.\n", enable ? "ENABLED" : "DISABLED");
-
-        // Optional: read short echo (4 bytes)
-        uint8_t writeEcho[4] = {0};
-        int echoCount = uart_read_bytes(UART_PORT, writeEcho, sizeof(writeEcho), pdMS_TO_TICKS(100));
-        if (echoCount < 4) {
-            printf("GCONF write echo mismatch! Only %d bytes echoed.\n", echoCount);
-        }
+    // Step 8: Warning if GCONF does not reflect expected mode after retries
+    printf("Warning: GCONF did not reflect the expected mode after multiple reads.\n");
 }
 
 };
 
 
 extern "C" void app_main() {
-    TMC2208 driver;
+    TMC2208 stepperDriver;
+//    RMTStepper stepper(stepperDriver.StepPin);
 
-//    driver.setStealthChop(true);
-    RMTStepper stepper(driver.StepPin);
- 
-    stepper.setFrequency(1000.0);    
+    float frequencyMin = 200.0F;
+    float frequencyMax = 4000.0F;
+    float frequencyIncrement = 50.0F;
+    float currentFrequency = frequencyMin;
+    bool increasing = true;
+    bool stealthChopEnabled = true;  // Initial mode
+    bool cycleComplete = false;      // Flag to track full cycle completion
+
+    stepperDriver.configureCurrentScaling(16, 8);  // 50% run current, 25% hold current
+
+    // Set initial configuration
+    stepperDriver.setStealthChop(false);
+    stepperDriver.setMicrosteps(256);
+
+    TickType_t lastWakeTime = xTaskGetTickCount();
+    TickType_t lastStatusTime = lastWakeTime;
+    const TickType_t frequencyChangeInterval = pdMS_TO_TICKS(300);
+    const TickType_t statusPrintInterval = pdMS_TO_TICKS(1000);
+
     while (true) {
-#if 0
-        std::array<uint8_t, 8> response = TMC2208::getDriverStatus();
-        if (response.empty()) {
-            printf("Failed to get driver status!\n");
-        } else {
-            printf("\nDRV_STATUS: ");
-            TMC2208::decodeDriverStatus(response);
+        // Print driver status every second
+        if (xTaskGetTickCount() - lastStatusTime >= statusPrintInterval) {
+            auto driverStatus = stepperDriver.getDriverStatus();
+            TMC2208::decodeDriverStatus(driverStatus);
+            lastStatusTime = xTaskGetTickCount();
         }
 
-#endif
+        // Set motor frequency
+        stepperDriver.setMotorSpeedRPM(currentFrequency);
+        // Wait for the next cycle
+        vTaskDelayUntil(&lastWakeTime, frequencyChangeInterval);
 
+        // Change direction when reaching limits
+        if (increasing) {
+            currentFrequency += frequencyIncrement;
+            if (currentFrequency > frequencyMax) {
+                currentFrequency = frequencyMax;
+                increasing = false;
+                cycleComplete = true;  // Mark that we reached the top
+            }
+        } else {
+            currentFrequency -= frequencyIncrement;
+            if (currentFrequency < frequencyMin) {
+                currentFrequency = frequencyMin;
+                increasing = true;
 
- //       stepper.toggle();
-        vTaskDelay(pdMS_TO_TICKS(5000));
+                // Check if a full cycle (up and down) has completed
+                if (cycleComplete) {
+                    // Toggle StealthChop mode once per full cycle
+                    stealthChopEnabled = !stealthChopEnabled;
+    //                stepperDriver.setStealthChop(stealthChopEnabled);
+                    printf("StealthChop is now %s.\n", stealthChopEnabled ? "ENABLED" : "DISABLED");
+
+                    // Reset cycle complete flag
+                    cycleComplete = false;
+                }
+            }
+        }
     }
 }
