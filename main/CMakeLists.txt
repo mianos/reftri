@@ -1,8 +1,10 @@
 idf_component_register(
     SRCS
        "main.cpp"
+       "stepper_task.c"
     INCLUDE_DIRS
         "."
     REQUIRES 
         driver
+        stepper_driver
 )
