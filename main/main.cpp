@@ -15,7 +15,7 @@ TaskHandle_t pvTask1 = nullptr;
 extern "C" void app_main() {
     static stepper_conf_t task1_conf{};
     task1_conf.name = "Task 1";
-    task1_conf.speed = 100;
+    task1_conf.speed = 10;
     
     task1_conf.stepper_driver_conf.direction_pin = GPIO_NUM_26;
     task1_conf.stepper_driver_conf.step_pin = GPIO_NUM_2;

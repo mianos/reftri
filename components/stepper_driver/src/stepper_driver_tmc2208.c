@@ -207,8 +207,9 @@ esp_err_t tmc2208_steps(stepper_driver_t *handle, uint32_t steps, uint32_t signa
     // loop_count = 1 => transmit exactly once, no hardware looping
     // eot_level = 0 => drive output LOW after final pulse
     rmt_transmit_config_t txConfig = {};
+#ifdef SOC_RMT_SUPPORT_TX_LOOP_COUNT
     txConfig.loop_count = 1; // Exactly one sequence, i.e., 'steps' pulses
-    txConfig.flags.eot_level = 0;
+#endif
 
     // Start transmission: we give 'items' pointer + its size in bytes
     esp_err_t ret = rmt_transmit(
