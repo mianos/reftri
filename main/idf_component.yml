@@ -14,3 +14,7 @@ dependencies:
   #   # `public` flag doesn't have an effect dependencies of the `main` component.
   #   # All dependencies of `main` are public by default.
   #   public: true
+  stepper_driver:
+    git: https://github.com/mianos/ESP32-TMC2208-UART-Component.git
+    version: develop
+    path: components/stepper_driver

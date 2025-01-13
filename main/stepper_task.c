@@ -52,19 +52,19 @@ void stepper_task(void *pvParameter){
   stepper_driver_enable(motor);
 
   vTaskDelay(pdMS_TO_TICKS(1000));
-#if 0
+#if 1
   ESP_LOGD(TAG, "%s: Move stepper per steps", task_name);
 
   for (int i = 0; i < 10; i++) {
     stepper_driver_direction(motor, 0);
-    stepper_driver_steps(motor, 1000, config->speed);
+    stepper_driver_steps(motor, 10000, config->speed / 4);
 
     vTaskDelay(pdMS_TO_TICKS(100));
 
     stepper_driver_direction(motor, 1);
-    stepper_driver_steps(motor, 1000, config->speed * 2);
+    stepper_driver_steps(motor, 10000, config->speed / 2);
 
-    vTaskDelay(pdMS_TO_TICKS(100));
+    vTaskDelay(pdMS_TO_TICKS(200));
   }
 #endif
   ESP_LOGD(TAG, "%s: Move stepper by register", task_name);
