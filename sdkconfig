@@ -385,6 +385,12 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
+# Web TMC
+#
+CONFIG_BUTTON_PIN=35
+# end of Web TMC
+
+#
 # Compiler options
 #
 CONFIG_COMPILER_OPTIMIZATION_DEBUG=y

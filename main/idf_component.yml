@@ -18,3 +18,19 @@ dependencies:
     git: https://github.com/mianos/ESP32-TMC2208-UART-Component.git
     version: develop
     path: components/stepper_driver
+  jsonwrapper:
+    git: git@github.com:mianos/mianesp.git
+    path: components/jsonwrapper
+    version: main
+  nvsstoragemanager:
+    git: git@github.com:mianos/mianesp.git
+    path: components/nvsstoragemanager
+    version: main
+  wifimanager:
+    git: git@github.com:mianos/mianesp.git
+    path: components/wifimanager
+    version: main
+  button:
+    git: git@github.com:mianos/mianesp.git
+    path: components/button
+    version: main
