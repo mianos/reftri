@@ -48,7 +48,6 @@ void initialize_sntp(SettingsManager& settings) {
              timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
 }
 
-#if 0
 void button_task(void *pvParameters) {
 	WiFiManager *wifiManager = static_cast<WiFiManager*>(pvParameters);  // Cast the void pointer back to WiFiManager pointer
 
@@ -61,7 +60,7 @@ void button_task(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(100)); // Check every 100 ms
     }
 }
-#endif
+
 
 extern "C" void app_main() {
     static stepper_conf_t task1_conf{};
@@ -85,7 +84,7 @@ extern "C" void app_main() {
 
 	wifiSemaphore = xSemaphoreCreateBinary();
 	WiFiManager wifiManager(nv, localEventHandler, nullptr);
-//	xTaskCreate(button_task, "button_task", 2048, &wifiManager, 10, NULL);
+	xTaskCreate(button_task, "button_task", 3000, &wifiManager, 10, NULL);
     if (xSemaphoreTake(wifiSemaphore, portMAX_DELAY) ) {
 		ESP_LOGI(TAG, "Main task continues after WiFi connection. duty is %g", settings.duty);
 		initialize_sntp(settings);
