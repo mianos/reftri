@@ -1,0 +1,55 @@
+dependencies:
+  button:
+    component_hash: b4591caffa3193bfa0e3b4918d0e336f25d3422e32ac20b3cf85ff15b43617b9
+    dependencies: []
+    source:
+      git: git@github.com:mianos/mianesp.git
+      path: components/button
+      type: git
+    version: 6bca268c70a1705eb983fa48327bb16a00092234
+  idf:
+    source:
+      type: idf
+    version: 5.3.0
+  jsonwrapper:
+    component_hash: e9794f8edc902d5bc3e61ac4cf17f505e4ffbf3dfd812ce26e545025afe81d57
+    dependencies: []
+    source:
+      git: git@github.com:mianos/mianesp.git
+      path: components/jsonwrapper
+      type: git
+    version: 6bca268c70a1705eb983fa48327bb16a00092234
+  nvsstoragemanager:
+    component_hash: cef848bc7e88b7a257c369d448b0c1026e37d006703c384db9f1b7a4ef67ffae
+    dependencies: []
+    source:
+      git: git@github.com:mianos/mianesp.git
+      path: components/nvsstoragemanager
+      type: git
+    version: 6bca268c70a1705eb983fa48327bb16a00092234
+  stepper_driver:
+    component_hash: c314b8147a440fdd68e2335c28daffa6568e107646fe2fbe306f9c2d0eb98576
+    dependencies: []
+    source:
+      git: https://github.com/mianos/ESP32-TMC2208-UART-Component.git
+      path: components/stepper_driver
+      type: git
+    version: 7086fa0a16c06b3eb53cc58cda706adb7fe1742d
+  wifimanager:
+    component_hash: 970c6fe0713c99962145e6c68d5ce525e8ce3c7e77eaa5210875b06a3521ffce
+    dependencies: []
+    source:
+      git: git@github.com:mianos/mianesp.git
+      path: components/wifimanager
+      type: git
+    version: 6bca268c70a1705eb983fa48327bb16a00092234
+direct_dependencies:
+- button
+- idf
+- jsonwrapper
+- nvsstoragemanager
+- stepper_driver
+- wifimanager
+manifest_hash: f0b719319e3bd024578e60b38cf92aede4d084ad59ae5368d0fd698cc0105ce7
+target: esp32
+version: 2.0.0
