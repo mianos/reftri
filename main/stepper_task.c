@@ -42,8 +42,8 @@ void stepper_task(void *pvParameter){
   ESP_LOGD(TAG, "%s: Write settings to stepper driver", task_name);
 
   stepper_driver_set_stealthchop_thrs(motor, 0);
-  stepper_driver_set_current(motor, 1000, 50);
-  stepper_driver_set_microsteps_per_step(motor, MICROSTEPS_32);
+  stepper_driver_set_current(motor, 1500, 50);
+//  stepper_driver_set_microsteps_per_step(motor, MICROSTEPS_64);
 
   stepper_driver_enable_pwm_autograd(motor);
   stepper_driver_enable_pwm_autoscale(motor);
@@ -68,6 +68,7 @@ void stepper_task(void *pvParameter){
   }
 #endif
   ESP_LOGD(TAG, "%s: Move stepper by register", task_name);
+  stepper_driver_set_current(motor, 1500, 50);
   stepper_driver_set_vactual(motor, 10000);
 
   vTaskDelay(pdMS_TO_TICKS(5000));
