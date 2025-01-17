@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS
        main.cpp
+       TMCWeb.cpp
     INCLUDE_DIRS
         "."
     REQUIRES 

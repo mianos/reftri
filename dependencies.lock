@@ -6,7 +6,7 @@ dependencies:
       git: git@github.com:mianos/mianesp.git
       path: components/button
       type: git
-    version: 4efb1f72946d9ee0f80e85ee80674c8cb7f4e999
+    version: 6b06d062e4083bda0b6f4eec96b3f3c4611dfb32
   idf:
     source:
       type: idf
@@ -18,7 +18,7 @@ dependencies:
       git: git@github.com:mianos/mianesp.git
       path: components/jsonwrapper
       type: git
-    version: 4efb1f72946d9ee0f80e85ee80674c8cb7f4e999
+    version: 6b06d062e4083bda0b6f4eec96b3f3c4611dfb32
   nvsstoragemanager:
     component_hash: cef848bc7e88b7a257c369d448b0c1026e37d006703c384db9f1b7a4ef67ffae
     dependencies: []
@@ -26,7 +26,7 @@ dependencies:
       git: git@github.com:mianos/mianesp.git
       path: components/nvsstoragemanager
       type: git
-    version: 4efb1f72946d9ee0f80e85ee80674c8cb7f4e999
+    version: 6b06d062e4083bda0b6f4eec96b3f3c4611dfb32
   stepper_driver:
     component_hash: c314b8147a440fdd68e2335c28daffa6568e107646fe2fbe306f9c2d0eb98576
     dependencies: []
@@ -36,7 +36,7 @@ dependencies:
       type: git
     version: 7086fa0a16c06b3eb53cc58cda706adb7fe1742d
   webserver:
-    component_hash: b6e136937c1a2e265510b0740ee1f81b353aecc880e41bbf917b47126b968bbd
+    component_hash: be7a95609c81b1788afa635df85eb66033e298947f19b4023aa0fbe0adfaf167
     dependencies:
     - git: git@github.com:mianos/mianesp.git
       name: wifimanager
@@ -58,7 +58,7 @@ dependencies:
       git: git@github.com:mianos/mianesp.git
       path: components/webserver
       type: git
-    version: 4efb1f72946d9ee0f80e85ee80674c8cb7f4e999
+    version: 6b06d062e4083bda0b6f4eec96b3f3c4611dfb32
   wifimanager:
     component_hash: 970c6fe0713c99962145e6c68d5ce525e8ce3c7e77eaa5210875b06a3521ffce
     dependencies: []
@@ -66,7 +66,7 @@ dependencies:
       git: git@github.com:mianos/mianesp.git
       path: components/wifimanager
       type: git
-    version: 4efb1f72946d9ee0f80e85ee80674c8cb7f4e999
+    version: 6b06d062e4083bda0b6f4eec96b3f3c4611dfb32
 direct_dependencies:
 - button
 - idf

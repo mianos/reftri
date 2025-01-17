@@ -26,5 +26,8 @@ public:
 	    TMCWebServer(TMCWebContext* tmcContext)
         : WebServer(tmcContext) {
     }
+	esp_err_t start() override;
+private:
+    static esp_err_t set_motor_speed_handler(httpd_req_t* req);
 };
 
