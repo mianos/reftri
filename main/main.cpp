@@ -83,7 +83,7 @@ extern "C" void app_main() {
 		ESP_LOGI(TAG, "Main task continues after WiFi connection. duty is %g", settings.duty);
 		initialize_sntp(settings);
 
-		static TMCWebContext ctx{&wifiManager, &settings};
+		static TMCWebContext ctx{&wifiManager, &settings, &stepper};
         static TMCWebServer  webServer{&ctx};
 
         if (webServer.start() == ESP_OK) {

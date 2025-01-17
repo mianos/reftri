@@ -4,15 +4,18 @@
 
 #include "SettingsManager.h"
 #include "WifiManager.h"
+#include "StepperMotor.h"
 
 
 // Derived struct for advanced context
 struct TMCWebContext : public WebContext {
     SettingsManager* settingsManager;
+    StepperMotor* stepperMotor;
 
-    TMCWebContext(WiFiManager* wifiPointer, SettingsManager* settingsPointer)
+    TMCWebContext(WiFiManager* wifiPointer, SettingsManager* settingsPointer, StepperMotor* stepperMotor)
         : WebContext(wifiPointer),
-          settingsManager(settingsPointer) {
+          settingsManager(settingsPointer),
+		  stepperMotor(stepperMotor){
     }
 };
 
