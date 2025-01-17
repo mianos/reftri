@@ -7,16 +7,14 @@
 #include "esp_sntp.h"
 #include "esp_log.h"
 
-#include "stepper_task.h"
+#include "StepperMotor.h"
 
 #include "Button.h"
 #include "WifiManager.h"
 #include "TMCWeb.h"
-//#include "SettingsManager.h"
 
 static const char* TAG = "main";
 
-TaskHandle_t pvTask1 = nullptr;
 static SemaphoreHandle_t wifiSemaphore;
 
 static void localEventHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
@@ -63,22 +61,18 @@ void button_task(void *pvParameters) {
 
 
 extern "C" void app_main() {
-    static stepper_conf_t task1_conf{};
-    task1_conf.name = "Task 1";
-    task1_conf.speed = 10;
-    
-    task1_conf.stepper_driver_conf.direction_pin = GPIO_NUM_26;
-    task1_conf.stepper_driver_conf.step_pin = GPIO_NUM_2;
-    task1_conf.stepper_driver_conf.enable_pin = GPIO_NUM_17;
-    task1_conf.stepper_driver_conf.uart_port = UART_NUM_1;
-    task1_conf.stepper_driver_conf.rx_pin = GPIO_NUM_12;
-    task1_conf.stepper_driver_conf.tx_pin = GPIO_NUM_13;
-    task1_conf.stepper_driver_conf.baud_rate = 115200;
-    
-    
-    ESP_LOGI(TAG, "Starting Task 1");
-    xTaskCreatePinnedToCore(&stepper_task, "Task 1", 4096, &task1_conf, 5, &pvTask1, 1);
+	stepper_driver_tmc2208_conf_t driver_conf = {};
 
+    driver_conf.direction_pin = GPIO_NUM_26;
+    driver_conf.step_pin = GPIO_NUM_2;
+    driver_conf.enable_pin = GPIO_NUM_17;
+    driver_conf.uart_port = UART_NUM_1;
+    driver_conf.rx_pin = GPIO_NUM_12;
+    driver_conf.tx_pin = GPIO_NUM_13;
+    driver_conf.baud_rate = 115200;
+    
+    
+	StepperMotor stepper{driver_conf};
 	NvsStorageManager nv;
 	SettingsManager settings(nv);
 
