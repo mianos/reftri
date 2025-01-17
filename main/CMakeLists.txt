@@ -1,7 +1,6 @@
 idf_component_register(
     SRCS
        main.cpp
-	   WebServer.cpp
        stepper_task.c
     INCLUDE_DIRS
         "."
@@ -11,6 +10,5 @@ idf_component_register(
         wifimanager
         nvsstoragemanager
         jsonwrapper
-        esp_http_server
         button
 )
