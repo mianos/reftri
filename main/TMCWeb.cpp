@@ -25,14 +25,10 @@ esp_err_t TMCWebServer::start() {
 }
 
 esp_err_t TMCWebServer::set_motor_speed_handler(httpd_req_t* req) {
-    // Retrieve the TMCWebServer context
-    TMCWebServer* server = static_cast<TMCWebServer*>(req->user_ctx);
-    if (!server) {
-        ESP_LOGE(TAG, "Server context is null");
-        httpd_resp_send_500(req);
-        return ESP_FAIL;
-    }
-
+	auto* ws = static_cast<TMCWebContext*>(get_context(req));
+	if (!ws) {
+		return ESP_FAIL; // The context is not of type TMCWebContext
+	}
     // Read the request body
     size_t content_len = req->content_len;
     std::string body;
@@ -67,7 +63,7 @@ esp_err_t TMCWebServer::set_motor_speed_handler(httpd_req_t* req) {
     ESP_LOGI(TAG, "Received motor speed: %d", static_cast<int>(speed));
 
     // Placeholder for actual motor control logic
-    // Example: stepper_driver_set_vactual(server->webContext->stepperMotor, speed);
+    stepper_driver_set_vactual(ws->stepperMotor, speed);
 
     // Create a JSON response using JsonWrapper
     JsonWrapper response;
