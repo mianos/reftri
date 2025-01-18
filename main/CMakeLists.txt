@@ -1,7 +1,6 @@
 idf_component_register(
     SRCS
        main.cpp
-       WebServer.cpp
        TMCWeb.cpp
     INCLUDE_DIRS
         "."
@@ -9,5 +8,4 @@ idf_component_register(
         driver
         stepper_driver
         button
-        esp_http_server
 )
