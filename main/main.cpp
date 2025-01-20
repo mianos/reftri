@@ -63,12 +63,12 @@ void button_task(void *pvParameters) {
 extern "C" void app_main() {
 	stepper_driver_tmc2208_conf_t driver_conf = {};
 
-    driver_conf.direction_pin = GPIO_NUM_26;
-    driver_conf.step_pin = GPIO_NUM_2;
-    driver_conf.enable_pin = GPIO_NUM_17;
+    driver_conf.direction_pin = GPIO_NUM_NC;
+    driver_conf.step_pin = GPIO_NUM_NC;
+    driver_conf.enable_pin = GPIO_NUM_2;
     driver_conf.uart_port = UART_NUM_1;
-    driver_conf.rx_pin = GPIO_NUM_12;
-    driver_conf.tx_pin = GPIO_NUM_13;
+    driver_conf.rx_pin = GPIO_NUM_0;
+    driver_conf.tx_pin = GPIO_NUM_1;
     driver_conf.baud_rate = 115200;
     
     
