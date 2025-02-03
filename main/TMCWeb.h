@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdio> // for snprintf
 #include "WebServer.h"
 
 #include "SettingsManager.h"
@@ -33,30 +32,29 @@ private:
 	static esp_err_t pump_handler(httpd_req_t* req);
 
 protected:
-
 	static esp_err_t sendJsonError(httpd_req_t* req,
-						     int statusCode,
-							 const std::string& errorMessage) {
-		char statusBuffer[32];
-		// Example: "400 Bad Request", "500 Internal Server Error", etc.
-		// If you want just the number, that’s fine too.
+								   int statusCode,
+								   const std::string& errorMessage) {
+		std::string statusLine;
 		switch (statusCode) {
 			case 400:
-				snprintf(statusBuffer, sizeof(statusBuffer), "400 Bad Request");
+				statusLine = "400 Bad Request";
 				break;
 			case 404:
-				snprintf(statusBuffer, sizeof(statusBuffer), "404 Not Found");
+				statusLine = "404 Not Found";
 				break;
 			case 500:
-				snprintf(statusBuffer, sizeof(statusBuffer), "500 Internal Server Error");
+				statusLine = "500 Internal Server Error";
 				break;
 			default:
-				// Fallback or pass through the numeric code
-				snprintf(statusBuffer, sizeof(statusBuffer), "%d", statusCode);
+				// Fallback: just turn the status code into a string
+				statusLine = std::to_string(statusCode);
+				// If you prefer, append some text:
+				// statusLine += " Some Custom Error";
 				break;
 		}
 
-		httpd_resp_set_status(req, statusBuffer);
+		httpd_resp_set_status(req, statusLine.c_str());
 		httpd_resp_set_type(req, "application/json");
 
 		JsonWrapper json;
@@ -65,7 +63,7 @@ protected:
 		std::string out = json.ToString();
 
 		httpd_resp_sendstr(req, out.c_str());
-		return ESP_FAIL; // Typically return ESP_FAIL so the caller knows it's an error
+		return ESP_FAIL;
 	}
 
 };
