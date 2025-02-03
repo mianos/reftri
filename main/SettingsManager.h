@@ -23,6 +23,7 @@ public:
     int frequency = 1000;
     float duty = 10;
     bool invert = false;
+    float max_speed = 10000.0;
 
     std::string convertChangesToJson(const SettingsManager::ChangeList& changes) {
         cJSON *root = cJSON_CreateObject();
@@ -41,12 +42,14 @@ public:
 
         nvs.retrieve("tz", tz);
         nvs.retrieve("ntpServer", ntpServer);
+		if (nvs.retrieve("max_speed", value)) max_speed = std::stod(value);
     }
 
     std::string toJson() const {
         JsonWrapper json;
         json.AddItem("tz", tz);
         json.AddItem("ntpServer", ntpServer);
+        json.AddItem("max_speed", max_speed);
         return json.ToString();
     }
 
@@ -59,6 +62,7 @@ public:
         JsonWrapper json = JsonWrapper::Parse(jsonString);
         updateFieldIfChanged(json, "tz", tz, changes);
         updateFieldIfChanged(json, "ntpServer", ntpServer, changes);
+        updateFieldIfChanged(json, "max_speed", max_speed, changes);
         // Save any changes to NVRAM
         for (const auto& [key, value] : changes) {
             nvs.store(key, value);
