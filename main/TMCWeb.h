@@ -30,6 +30,7 @@ public:
 private:
     static esp_err_t set_motor_speed_handler(httpd_req_t* req);
 	static esp_err_t pump_handler(httpd_req_t* req);
+	static esp_err_t set_settings_handler(httpd_req_t* request);
 
 protected:
 	static esp_err_t sendJsonError(httpd_req_t* req,
@@ -49,8 +50,6 @@ protected:
 			default:
 				// Fallback: just turn the status code into a string
 				statusLine = std::to_string(statusCode);
-				// If you prefer, append some text:
-				// statusLine += " Some Custom Error";
 				break;
 		}
 
