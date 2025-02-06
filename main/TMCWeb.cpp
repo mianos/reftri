@@ -186,6 +186,7 @@ esp_err_t TMCWebServer::pump_handler(httpd_req_t* request) {
 	int speed = static_cast<int>(ctx->settingsManager->max_speed * fraction);
 	ctx->stepperMotor->setVelocity(speed);
 
+	ctx->currentDuty = duty;
     JsonWrapper response;
     response.AddItem("status", "OK");
     response.AddItem("duty", duty);
@@ -195,4 +196,10 @@ esp_err_t TMCWebServer::pump_handler(httpd_req_t* request) {
     httpd_resp_set_type(request, "application/json");
     httpd_resp_sendstr(request, responseStr.c_str());
     return ESP_OK;
+}
+
+void TMCWebServer::populate_healthz_fields(WebContext *ctx, JsonWrapper& json) {
+	auto* wc = static_cast<TMCWebContext*>(ctx);
+    json.AddItem("duty", wc->currentDuty);
+    json.AddItem("max_speed", wc->settingsManager->max_speed);
 }

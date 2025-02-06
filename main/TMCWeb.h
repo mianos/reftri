@@ -11,7 +11,7 @@
 struct TMCWebContext : public WebContext {
     SettingsManager* settingsManager;
     StepperMotor* stepperMotor;
-
+	float currentDuty = 0.0;
     TMCWebContext(WiFiManager* wifiPointer, SettingsManager* settingsPointer, StepperMotor* stepperMotor)
         : WebContext(wifiPointer),
           settingsManager(settingsPointer),
@@ -33,37 +33,6 @@ private:
 	static esp_err_t set_settings_handler(httpd_req_t* request);
 
 protected:
-	static esp_err_t sendJsonError(httpd_req_t* req,
-								   int statusCode,
-								   const std::string& errorMessage) {
-		std::string statusLine;
-		switch (statusCode) {
-			case 400:
-				statusLine = "400 Bad Request";
-				break;
-			case 404:
-				statusLine = "404 Not Found";
-				break;
-			case 500:
-				statusLine = "500 Internal Server Error";
-				break;
-			default:
-				// Fallback: just turn the status code into a string
-				statusLine = std::to_string(statusCode);
-				break;
-		}
-
-		httpd_resp_set_status(req, statusLine.c_str());
-		httpd_resp_set_type(req, "application/json");
-
-		JsonWrapper json;
-		json.AddItem("error", errorMessage);
-		json.AddItem("statusCode", statusCode);
-		std::string out = json.ToString();
-
-		httpd_resp_sendstr(req, out.c_str());
-		return ESP_FAIL;
-	}
-
+    virtual void populate_healthz_fields(WebContext *ctx, JsonWrapper& json);
 };
 
